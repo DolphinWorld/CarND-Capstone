@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 
+from std_msgs.msg import Int32
 import rospy
 import numpy as np
 from geometry_msgs.msg import PoseStamped
@@ -32,6 +33,7 @@ class WaypointUpdater(object):
         rospy.init_node('waypoint_updater')
 
         # TODO: Add other member variables you need below
+        self.light_state = 1
         self.base_lane = None
         self.stopline_wp_idx = -1
         self.pose = None
@@ -41,7 +43,7 @@ class WaypointUpdater(object):
 
         rospy.Subscriber('/current_pose', PoseStamped, self.pose_cb)
         rospy.Subscriber('/base_waypoints', Lane, self.waypoints_cb)
-        rospy.Subscriber('/traffic_waypoint', Lane, self.traffic_cb)
+        rospy.Subscriber('/traffic_waypoint', Int32, self.traffic_cb)
 #        rospy.Subscriber('/obstacle_waypoint', Lane, self.obstacle_cb)
 
         # TODO: Add a subscriber for /traffic_waypoint and /obstacle_waypoint below
@@ -92,9 +94,17 @@ class WaypointUpdater(object):
         base_waypoints = self.base_lane.waypoints[closest_idx:farthest_idx]
 
         if self.stopline_wp_idx == -1 or (self.stopline_wp_idx >= farthest_idx):
+            #print("no traffic", self.stopline_wp_idx, self.stopline_wp_idx, farthest_idx)
+            #rospy.logwarn("no traffic light {0}, {1}, {2}".format(self.stopline_wp_idx, self.stopline_wp_idx, farthest_idx))
             lane.waypoints = base_waypoints
+            state = 0
+            if self.light_state != state:
+                self.light_state = state
         else:
+            state = 1
             lane.waypoints = self.decelerate_waypoints(base_waypoints, closest_idx)
+            if self.light_state != state:
+                self.light_state = state
 
         return lane
 
@@ -127,11 +137,14 @@ class WaypointUpdater(object):
             self.waypoints_2d = [[waypoint.pose.pose.position.x, waypoint.pose.pose.position.y] for waypoint in waypoints.waypoints]
             self.waypoint_tree = KDTree(self.waypoints_2d)
 
+
     def traffic_cb(self, msg):
+        #rospy.logwarn("update waypiont traffic cb {}".format(msg.data))
         # TODO: Callback for /traffic_waypoint message. Implement
         self.stopline_wp_idx = msg.data
 
         #pass
+
 
     def obstacle_cb(self, msg):
         # TODO: Callback for /obstacle_waypoint message. We will implement it later
